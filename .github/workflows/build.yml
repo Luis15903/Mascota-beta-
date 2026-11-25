@@ -1,0 +1,44 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preparar proyecto (acepta el proyecto suelto o un .zip)
+        run: |
+          if [ -f settings.gradle.kts ]; then
+            PROJ=.
+          else
+            ZIP=$(ls *.zip 2>/dev/null | head -1)
+            if [ -z "$ZIP" ]; then echo "No hay proyecto ni .zip en la raiz del repo"; exit 1; fi
+            echo "Usando $ZIP"
+            mkdir -p _proyecto
+            unzip -q -o "$ZIP" -d _proyecto
+            PROJ=$(dirname "$(find _proyecto -name settings.gradle.kts | head -1)")
+          fi
+          echo "Proyecto en: $PROJ"
+          echo "PROJ=$PROJ" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compilar
+        run: cd "$PROJ" && gradle assembleDebug --no-daemon
+
+      - name: Renombrar a luky.apk
+        run: cp "$PROJ/app/build/outputs/apk/debug/app-debug.apk" luky.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Luky-APK
+          path: luky.apk
